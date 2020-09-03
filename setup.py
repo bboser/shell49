@@ -12,7 +12,8 @@ from lib.version import __version__
 #   Win:   pyreadline
 install_req=[
     'pyserial >= 2.0',
-    'zeroconf >= 0.19'
+    'zeroconf >= 0.19',
+    'blessed >= 1.17.10'
 ]
 if sys.platform == 'darwin':
     install_req.append('gnureadline')

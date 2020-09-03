@@ -21,7 +21,7 @@ import sys
 #    want to consider using the pyreadline module instead, which is a readline
 #    replacement written in pure Python that interacts with the Windows clipboard.
 try:
-    if sys.platform == 'darwin':
+    if sys.platform == 'darwin' or sys.platform == 'linux':
         import gnureadline as readline
     elif sys.platform == 'win32':
         # import pyreadline as readline

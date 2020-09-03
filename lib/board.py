@@ -10,6 +10,8 @@ import inspect
 import traceback
 import os
 
+from blessed import Terminal
+
 QUIT_REPL_CHAR = 'X'
 QUIT_REPL_BYTE = bytes((ord(QUIT_REPL_CHAR) - ord('@'),))  # Control-X
 
@@ -218,14 +220,28 @@ class Board(object):
 
     def enter_raw_repl_mp(self):
         """Enter raw repl if not already in this mode for MICROPYTHON."""
-        # Ctrl-C twice: interrupt any running program
-        dprint("^C, abort running program")
-        self._serial.write(b'\r\x03\x03')
+        dprint("^B^C, abort running program")
+        self._serial.write(b'\r\x02\x03')
+        time.sleep(.1)
 
-        # discard any waiting input
-        dprint("purge in_waiting")
-        while self._serial.in_waiting:
-            self._serial.read(self._serial.in_waiting)
+        # Attempt to get to REPL prompt, send Ctrl-C on failure.
+        expect = b'> '
+        abort = True
+        for attempt in range(3):
+            try:
+                self._serial.read_until(1, expect)
+                abort = False
+                break
+            except ConnectionError as err:
+                dprint('ConnectionError: {0}'.format(err))
+                self._serial.write(b'\x03')
+                time.sleep(1)
+
+        # Kickout if 3rd attempt fails
+        if abort:
+            raise ConnectionError('Failed to enter raw REPL')
+
+        time.sleep(.1)
 
         # Ctrl-A: enter raw REPL
         dprint("^A, raw repl")
@@ -391,18 +407,21 @@ class Board(object):
     ###################################################################
     # repl
 
-    def _repl_serial(self, putch, serial_ok):
+    def _repl_serial(self, serial_ok):
         """Thread, copies bytes from serial to out"""
+
+        term = Terminal()
+
         try:
-            with serial_ok:
+            with serial_ok, term.raw():
                 save_timeout = self._serial.timeout
                 # Set a timeout so that the read returns periodically with no data
                 # and allows us to check whether the main thread wants us to quit.
                 self._serial.timeout = 0.4
                 while not self._quit_serial_reader:
                     char = self._serial.read(1)
-                    if char:
-                        putch(char)
+                    if char.decode('utf-8') != '':
+                        print(char.decode('utf-8'), end='', flush=True)
                 self._serial.timeout = save_timeout
         except ConnectionError as e:
             self.disconnect()
@@ -416,13 +435,14 @@ class Board(object):
             traceback.print_exc(file=s)
             eprint(s.getvalue().replace('\n', '\r'))
 
+    def repl(self, getch):
 
-    def repl(self, getch, putch):
         self.exit_raw_repl()
         # who knows what state we are in after repl?
         serial_ok = AutoBool()
+
         self._quit_serial_reader = False
-        repl_thread = Thread(target=self._repl_serial, args=(putch, serial_ok), name="REPL")
+        repl_thread = Thread(target=self._repl_serial, args=[serial_ok], name="REPL")
         repl_thread.daemon = True
         repl_thread.start()
         # wait for reader to start
@@ -440,7 +460,7 @@ class Board(object):
                     # wait for reader thread to notice
                     time.sleep(0.5)
                     # print newline so the shell49 prompt looks good
-                    putch(b'\r')
+                    print('\n')
                     # stay in the loop until the reader thread is quitting
                     continue
                 if char == b'\n':
@@ -449,7 +469,7 @@ class Board(object):
         except (AttributeError, BoardError):
             # Board no longer present?
             self.disconnect()
-            putch(b'\r')
+            print('\n')
 
 
 ###################################################################

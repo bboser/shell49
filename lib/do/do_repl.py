@@ -34,7 +34,7 @@ def do_repl(self, line):
     mprint('   Hard reset:  Reset button on board or machine.reset()')
     print(printing.MPY_COLOR, end='')
 
-    board.repl(getch, putch)
+    board.repl(getch)
     print()
 
 

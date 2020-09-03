@@ -118,17 +118,17 @@ class SerialConnection(Connection):
                 eprint("No board found")
                 sys.exit(1)
 
-            # wait for port to come online
-            for wait in range(3):
-                if os.path.exists(port): break
-                qprint("Waiting for port '{}' to come online".format(port))
-                time.sleep(1)
             # try to connect
             for attempt in range(5):
                 try:
                     self._serial = Serial(port, baudrate, parity='N', inter_byte_timeout=1)
                     break
                 except IOError as e:
+                    s = str(e)
+                    if s.find('FileNotFound') != -1:
+                        qprint("Could not open port '{}', Port not found".format(port))
+                        qprint(e)
+                        break
                     qprint("Waiting for serial connection at '{}'".format(port))
                     qprint(e)
                 time.sleep(1)
@@ -136,6 +136,7 @@ class SerialConnection(Connection):
             for attempt in range(20):
                 try:
                     self._serial.write(b'\x03')
+                    time.sleep(1)
                     break
                 except SerialException:
                     time.sleep(0.5)

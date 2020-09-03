@@ -42,15 +42,31 @@ class _GetchUnix:
 
 
 class _GetchWindows:
+
     def __init__(self):
         pass
 
     def __call__(self):
         import msvcrt
-        return msvcrt.getch()
+        lookup = {b'M': b'\x1b\x5b\x43',
+                  b'P': b'\x1b\x5b\x42',
+                  b'H': b'\x1b\x5b\x41',
+                  b'K': b'\x1b\x5b\x44',
+                  b'S': b'\x1b\x5b\x33\x7e',
+                  b'G': b'\x1b\x5b\x31\x7e',
+                  b'O': b'\x1b\x5b\x34\x7e'}
+        char = msvcrt.getch()
+        if char == b'\x08':
+            char = b'\x7f'
+        elif char == b'\xe0':
+            char = lookup.get(msvcrt.getch(), b' ')
+
+        return char
+        #return msvcrt.getch()
 
 getch = _Getch()
 
 if __name__ == "__main__":
     ch = getch()
-    print('ch =',  ch)
+    print('ch =', ch)
+
